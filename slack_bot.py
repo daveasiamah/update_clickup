@@ -1,8 +1,12 @@
+import os
 import slack_sdk
 from slack_sdk.errors import SlackApiError
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Slack Bot Setup
-slack_token = "xoxb-5746690128517-6087717649348-np2OMLQnU0wADepHp9YRPZp9"
+slack_token = os.getenv("SLACK_BOT_TOKEN")
 client = slack_sdk.WebClient(token=slack_token)
 
 
@@ -16,4 +20,4 @@ def send_slack_message(channel, message):
 
 
 # Example usage
-send_slack_message("#testing_clickup_updates", "Hello from Slack Bot!")
+# send_slack_message("#testing_clickup_updates", "Hello from Slack Bot!")
