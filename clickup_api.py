@@ -107,7 +107,7 @@ class ClickUpAccessor:
 
         # return clickup_list
 
-    async def get_all_space_tasks(self, space_id):
+    async def get_all_space_tasks(self, space_id, filter=None):
         """
         Get all tasks from a space
         :param space_id:
@@ -132,10 +132,17 @@ class ClickUpAccessor:
 
         print(f"Getting tasks from ClickUp with list_ids: {list_ids}")
         for list_id in list_ids:
-            tasks_list = await self.get_tasks(list_id)
+            tasks_list = []
+
+            if filter == "todo":
+                tasks_list = await self.get_todo_tasks(list_id)
+            if filter == None:
+                tasks_list = await self.get_tasks(list_id)
+
             tasks.extend([task for task in tasks_list])
 
         return tasks
+
 
     async def get_tasks(self, list_id, include_subtasks=True):
         url = "https://api.clickup.com/api/v2/list/" + list_id + "/task"
@@ -158,8 +165,35 @@ class ClickUpAccessor:
 
         return filtered_tasks
 
-    async def get_member_tasks(self, list_id, member_id, include_subtasks=True):
-        url = "https://api.clickup.com/api/v2/list/" + list_id + "/task" + "?assignees[]=" + member_id + "&statuses[]=to%20do&statuses[]=in%20progress"
+    async def get_todo_tasks(self, list_id, include_subtasks=True):
+        url = ("https://api.clickup.com/api/v2/list/" + list_id + "/task" +
+               "?statuses[]=to%20do&statuses[]=in%20progress")
+
+        query = {
+            "subtasks": include_subtasks,
+        }
+
+        res = requests.get(
+            url,
+            params=query,
+            headers={"Authorization": os.getenv("CLICKUP_API_KEY")})
+
+        response = res.json()
+
+        tasks = response["tasks"]
+
+        filtered_tasks = self.filter_tasks(tasks)
+
+        return filtered_tasks
+
+
+    async def get_member_tasks(self,
+                               list_id,
+                               member_id,
+                               include_subtasks=True):
+        url = ("https://api.clickup.com/api/v2/list/" + list_id + "/task" +
+               "?assignees[]=" + member_id +
+               "&statuses[]=to%20do&statuses[]=in%20progress")
 
         query = {
             "subtasks": include_subtasks,
@@ -208,8 +242,8 @@ class ClickUpAccessor:
             data=payload,
             headers={
                 "Authorization": os.getenv("CLICKUP_API_KEY"),
-                "Content-Type": "application/json"
-            }
+                "Content-Type": "application/json",
+            },
         )
 
         response = res.json()
@@ -222,17 +256,25 @@ class ClickUpAccessor:
 
         for task in tasks:
             filtered_task = {
-                "id": task["id"],
-                "name": task["name"],
-                "description": task["description"],
-                "date_created": task["date_created"],
-                "assignees": [
-                    {"id": assignee["id"], "username": assignee["username"]}
-                    for assignee in task["assignees"]
-                ],
-                "due_date": task["due_date"] if task["due_date"] else "",
-                "status": task["status"]["status"],
-                "list": task["list"],
+                "id":
+                task["id"],
+                "name":
+                task["name"],
+                "description":
+                task["description"],
+                "date_created":
+                task["date_created"],
+                "assignees": [{
+                    "id": assignee["id"],
+                    "username": assignee["username"],
+                    "email": assignee["email"],
+                } for assignee in task["assignees"]],
+                "due_date":
+                task["due_date"] if task["due_date"] else "",
+                "status":
+                task["status"]["status"],
+                "list":
+                task["list"],
             }
             filtered_tasks.append(filtered_task)
 

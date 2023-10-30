@@ -12,54 +12,89 @@ space_id = "90080537790"
 list_id = "900802489450"
 
 
+async def get_assigned_tasks(space_id):
+    assigned_tasks = []
+
+    tasks = await clickup_accessor.get_all_space_tasks(space_id, "todo")
+
+    if tasks:
+        for task in tasks:
+            if task["assignees"] != []:
+                assigned_tasks.append(task)
+
+    return assigned_tasks
+
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
 
-@app.get("/tasks/open/{member_id}")
-async def fetch_member_open_tasks(member_id: str):
-    tasks = await clickup_accessor.get_member_tasks(list_id, member_id)
+@app.get("/members/tasks/open")
+async def fetch_members_with_open_tasks():
+    members_list = []
+    tasks = await clickup_accessor.get_all_space_tasks(
+        space_id,
+        "todo",
+    )
+
+    for task in tasks:
+        if task["assignees"] != []:
+            for assignee in task["assignees"]:
+                if assignee["id"] not in [
+                        member["id"] for member in members_list
+                ]:
+                    members_list.append({
+                        "id": assignee["id"],
+                        "name": assignee["username"],
+                        "email": assignee["email"],
+                    })
 
     return {
-        "message": "Member open tasks fetched from ClickUp",
-        "tasks": tasks
+        "message": "Details of members with open tasks",
+        "count": len(members_list),
+        "members": members_list,
+    }
+
+
+@app.get("/tasks/open/{member_id}")
+async def fetch_member_open_tasks(member_id: str):
+    tasks_list = []
+
+    assigned_tasks = await get_assigned_tasks(space_id)
+    # print(assigned_tasks)
+
+    for task in assigned_tasks:
+        for assignee in task["assignees"]:
+            print(assignee["id"], member_id)
+            if str(assignee["id"]) == member_id:
+                tasks_list.append(task)
+
+    return {
+        "message": "Details of open tasks for the member",
+        "count": len(tasks_list),
+        "tasks": tasks_list,
     }
 
 
 @app.get("/fetch-assigned-tasks")
 async def fetch_assigned_tasks():
-    tasks = await clickup_accessor.get_tasks(list_id)
-    list_id = tasks[0]["list"]["id"]
+    tasks_with_assignees = await get_assigned_tasks(space_id)
 
-    list_members = await clickup_accessor.get_list_members(list_id)
-    print(f"DEBUGPRINT[1]: main.py:25: list_members={list_members}")
-
-    tasks_with_assignees = []
-
-    if tasks:
-        for task in tasks:
-            if task["assignees"] != []:
-                tasks_with_assignees.append(task)
-
-        print(
-            f"DEBUGPRINT[1]: main.py:38: tasks_with_assignees={tasks_with_assignees}"
-        )
-
-        return {
-            "message": "Tasks fetched from ClickUp and sent to Slack.",
-            "tasks_with_assignees": tasks_with_assignees,
-        }
+    return {
+        "message": "Tasks fetched from ClickUp and sent to Slack.",
+        "count": len(tasks_with_assignees),
+        "tasks_with_assignees": tasks_with_assignees,
+    }
 
 
 @app.get("/fetch-clickup-tasks")
 async def fetch_clickup_tasks():
-    list_id = "900802489450"
     # tasks = await clickup_accessor.get_all_space_tasks(space_id)
     tasks = await clickup_accessor.get_tasks(list_id)
-    list_id = tasks[0]["list"]["id"]
+    id = tasks[0]["list"]["id"]
 
-    list_members = await clickup_accessor.get_list_members(list_id)
+    list_members = await clickup_accessor.get_list_members(id)
     print(f"DEBUGPRINT[1]: main.py:25: list_members={list_members}")
 
     pending_tasks = []
